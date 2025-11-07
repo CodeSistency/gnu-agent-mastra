@@ -21,7 +21,7 @@ import { agentInstructions } from '../prompts/agent-instructions';
 export const medicalAdminAgent = new Agent({
   name: 'Asistente Administrativo Médico',
   instructions: agentInstructions,
-  model: 'google/gemini-2.5-pro',
+  model: 'google/gemini-2.5-flash',
   tools: {
     createPatientTool,
     getPatientTool,

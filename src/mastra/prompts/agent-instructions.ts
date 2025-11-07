@@ -368,10 +368,26 @@ Al sugerir correcciones o mejoras:
 <error_handling>
 Manejo de Errores:
 
+Estructura de Respuestas de la API:
+La API GNU Health siempre devuelve respuestas en el siguiente formato:
+\`\`\`json
+{
+  "data": [...],
+  "meta": {
+    "status": "success",
+    "message": "mensaje descriptivo"
+  }
+}
+\`\`\`
+
+IMPORTANTE: El mensaje real del error SIEMPRE está en meta.message, incluso cuando el HTTP status es 500.
+La API puede devolver HTTP 500 pero con meta.status: "success" y el mensaje descriptivo en meta.message.
+
 Código 200 (Éxito):
 - Confirmar operación exitosa
 - Mostrar datos relevantes del resultado
 - Proporcionar ID o información de referencia
+- Estructura: { "data": {...}, "meta": { "status": "success", "message": "..." } }
 
 Código 207 (Éxito Parcial):
 - Confirmar que la operación principal fue exitosa
@@ -379,23 +395,93 @@ Código 207 (Éxito Parcial):
 - Ejemplos de advertencias:
   * "Producto creado exitosamente pero ocurrió un problema al crear la relación template-category"
   * "Producto creado exitosamente pero ocurrió un problema al agregar el precio en su tabla relacional"
+- Estructura: { "data": {...}, "meta": { "status": "success", "message": "advertencia..." } }
 
 Código 400 (Solicitud Inválida):
-- Mensajes específicos:
+- Mensajes específicos (extraídos de meta.message):
   * "La fecha ingresada es inválida. Por favor verifique"
   * "El usuario no puede ser menor de edad"
   * "El tercero ya existe"
+- Estructura: { "data": [null], "meta": { "status": "success", "message": "mensaje de error" } }
 - Ofrecer ayuda para corregir los datos
 - Sugerir el formato correcto
 
 Código 401 (No Autorizado):
 - Informar que el token de autenticación es inválido o falta
 - Sugerir verificar la configuración de autenticación
+- Estructura: { "data": [null], "meta": { "status": "success", "message": "..." } }
 
 Código 500 (Error del Servidor):
-- Informar que ocurrió un error interno
-- Sugerir intentar nuevamente o contactar soporte
+- IMPORTANTE: El mensaje real está en meta.message, NO en el statusText
+- Ejemplo: HTTP 500 con meta.message: "No se pudo crear al tercero"
+- Estructura: { "data": [null], "meta": { "status": "success", "message": "mensaje descriptivo del error" } }
+- Informar el mensaje de meta.message al usuario
+- Sugerir verificar datos o intentar nuevamente
 - No exponer detalles técnicos internos
+
+Prioridad de Mensajes de Error:
+1. meta.message (SIEMPRE usar este si existe - es el mensaje real de la API)
+2. message (mensaje directo en la respuesta)
+3. error (campo error en la respuesta)
+4. statusText (solo como último recurso)
+
+Al mostrar errores al usuario:
+- Usar SIEMPRE el mensaje de meta.message si está disponible
+- Proporcionar sugerencias de corrección cuando sea apropiado
+- Ser claro y profesional
+- No mostrar mensajes técnicos genéricos como "INTERNAL SERVER ERROR"
+
+Manejo de Errores de API en Workflows:
+Cuando un workflow falla y recibes un error que contiene información JSON estructurada con "type": "api_error", 
+debes:
+1. Parsear el JSON del mensaje de error para obtener toda la información
+2. Extraer el apiMessage (que viene de meta.message de la respuesta de la API)
+3. Comunicar el error al usuario de forma clara y amigable usando el apiMessage
+4. Proporcionar contexto útil basado en:
+   - El statusCode (400, 401, 500, etc.)
+   - El apiMessage (mensaje real de la API)
+   - El endpoint donde ocurrió el error
+   - El contexto de la operación (create-patient, create-product, etc.)
+
+Ejemplo de error estructurado que recibirás (en formato JSON dentro del mensaje de error):
+{
+  "type": "api_error",
+  "statusCode": 500,
+  "apiMessage": "No se pudo crear al tercero",
+  "apiResponse": {
+    "data": [null],
+    "meta": {
+      "status": "success",
+      "message": "No se pudo crear al tercero"
+    }
+  },
+  "endpoint": "/user",
+  "method": "POST",
+  "context": "create-patient"
+}
+
+Al comunicar este error al usuario:
+- NO uses el statusCode directamente (no digas "Error 500")
+- USA el apiMessage como mensaje principal
+- Proporciona sugerencias específicas basadas en el contexto
+- Sé empático y profesional
+- Ofrece ayuda para resolver el problema
+
+Ejemplo de comunicación amigable:
+"Lo siento, no se pudo crear el paciente en el sistema. El mensaje del sistema indica: 'No se pudo crear al tercero'.
+
+Esto puede deberse a:
+- Datos incompletos o incorrectos
+- El paciente ya existe en el sistema
+- Problemas de validación en el servidor
+
+¿Puedes verificar que todos los datos sean correctos? Específicamente:
+- Nombre y apellido completos
+- Cédula válida y única
+- Fecha de nacimiento en formato YYYY-MM-DD
+- Género exactamente 'm' o 'f'
+
+Si el problema persiste, puedo ayudarte a verificar si el paciente ya existe consultando por su cédula."
 </error_handling>
 
 <best_practices>

@@ -2,6 +2,7 @@
 import { Mastra } from '@mastra/core/mastra';
 import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
+import { VercelDeployer } from '@mastra/deployer-vercel';
 import { medicalAdminAgent } from './agents/medical-admin-agent';
 import {
   dataAccuracyScorer,
@@ -34,6 +35,7 @@ export const mastra = new Mastra({
     name: 'Mastra',
     level: 'info',
   }),
+  deployer: new VercelDeployer(),
   telemetry: {
     // Telemetry is deprecated and will be removed in the Nov 4th release
     enabled: false, 

@@ -14,21 +14,21 @@ export const completenessScorer = createCompletenessScorer();
 
 // Data accuracy scorer - validates medical data accuracy with API-specific rules
 export const dataAccuracyScorer = createScorer({
-  name: 'Medical Data Accuracy',
-  description: 'Validates accuracy of medical data according to API requirements',
+  name: 'Precisión de Datos Médicos',
+  description: 'Valida la precisión de los datos médicos según los requisitos de la API',
   type: 'agent',
   judge: {
-    model: 'google/gemini-2.5-pro',
+    model: 'google/gemini-2.5-flash',
     instructions:
-      'You are an expert evaluator of medical data accuracy for GNU Health API. ' +
-      'Validate that data follows API specifications exactly. ' +
-      'Return only the structured JSON matching the provided schema.',
+      '<role>Eres un evaluador experto de precisión de datos médicos para la API de GNU Health.</role> ' +
+      '<task>Valida que los datos sigan exactamente las especificaciones de la API.</task> ' +
+      '<format>Devuelve solo el JSON estructurado que coincida con el esquema proporcionado.</format>',
   },
 })
   .preprocess(({ run }) => {
     const userText = (run.input?.inputMessages?.[0]?.content as string) || '';
     const assistantText = (run.output?.[0]?.content as string) || '';
-    const toolCalls = run.toolCalls || [];
+    const toolCalls = (run as any).toolCalls || [];
     return { userText, assistantText, toolCalls };
   })
   .analyze({
@@ -45,27 +45,35 @@ export const dataAccuracyScorer = createScorer({
       explanation: z.string().default(''),
     }),
     createPrompt: ({ results }) => `
-      Evaluate the medical data accuracy in this interaction according to GNU Health API specifications.
-      User request:
+      <role>Evalúa la precisión de los datos médicos en esta interacción según las especificaciones de la API GNU Health.</role>
+      
+      <input>
+      Solicitud del usuario:
       """
       ${results.preprocessStepResult.userText}
       """
-      Assistant response:
+      
+      Respuesta del asistente:
       """
       ${results.preprocessStepResult.assistantText}
       """
-      Tool calls made: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
       
-      Validate according to API requirements:
-      1) Dates are in ISO format (YYYY-MM-DD) - required format
-      2) Gender is exactly "m" or "f" (not "male"/"female"/"other")
-      3) Age is >= 18 years (calculate from dob)
-      4) Identification (cedula) is a valid format
-      5) Procedense is exactly "768" (required value)
-      6) Category IDs are 1-6 (1=Seguros, 2=Servicios de imágenes, 3=Servicios de laboratorio, 4=Medicamentos, 5=Medicamentos esenciales OMS, 6=Evaluación Médica)
-      7) Product type is "goods", "assets", or "service" (not other values)
+      Llamadas a herramientas realizadas: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
+      </input>
       
-      Return JSON with fields:
+      <validation_rules>
+      Valida según los requisitos de la API:
+      1) Fechas están en formato ISO (YYYY-MM-DD) - formato requerido
+      2) Género es exactamente "m" o "f" (no "male"/"female"/"other")
+      3) Edad es >= 18 años (calcular desde dob)
+      4) Identificación (cédula) tiene un formato válido
+      5) Procedense es exactamente "768" (valor requerido)
+      6) IDs de categoría son 1-6 (1=Seguros, 2=Servicios de imágenes, 3=Servicios de laboratorio, 4=Medicamentos, 5=Medicamentos esenciales OMS, 6=Evaluación Médica)
+      7) Tipo de producto es "goods", "assets", o "service" (no otros valores)
+      </validation_rules>
+      
+      <output_format>
+      Devuelve JSON con los campos:
       {
         "validDates": boolean,
         "validGender": boolean,
@@ -77,6 +85,7 @@ export const dataAccuracyScorer = createScorer({
         "confidence": number (0-1),
         "explanation": string
       }
+      </output_format>
     `,
   })
   .generateScore(({ results }) => {
@@ -100,22 +109,22 @@ export const dataAccuracyScorer = createScorer({
 
 // API Response Scorer - validates HTTP status codes and response structure
 export const apiResponseScorer = createScorer({
-  name: 'API Response Validation',
-  description: 'Validates HTTP status codes and response structure according to API',
+  name: 'Validación de Respuesta de API',
+  description: 'Valida los códigos de estado HTTP y la estructura de respuesta según la API',
   type: 'agent',
   judge: {
-    model: 'google/gemini-2.5-pro',
+    model: 'google/gemini-2.5-flash',
     instructions:
-      'You are an expert evaluator of API responses. ' +
-      'Validate that HTTP status codes and response structures match API specifications. ' +
-      'Return only the structured JSON matching the provided schema.',
+      '<role>Eres un evaluador experto de respuestas de API.</role> ' +
+      '<task>Valida que los códigos de estado HTTP y las estructuras de respuesta coincidan con las especificaciones de la API.</task> ' +
+      '<format>Devuelve solo el JSON estructurado que coincida con el esquema proporcionado.</format>',
   },
 })
   .preprocess(({ run }) => {
     const userText = (run.input?.inputMessages?.[0]?.content as string) || '';
     const assistantText = (run.output?.[0]?.content as string) || '';
-    const toolCalls = run.toolCalls || [];
-    const toolResults = run.toolResults || [];
+    const toolCalls = (run as any).toolCalls || [];
+    const toolResults = (run as any).toolResults || [];
     return { userText, assistantText, toolCalls, toolResults };
   })
   .analyze({
@@ -129,25 +138,33 @@ export const apiResponseScorer = createScorer({
       explanation: z.string().default(''),
     }),
     createPrompt: ({ results }) => `
-      Evaluate the API response handling in this interaction.
-      User request:
+      <role>Evalúa el manejo de la respuesta de la API en esta interacción.</role>
+      
+      <input>
+      Solicitud del usuario:
       """
       ${results.preprocessStepResult.userText}
       """
-      Assistant response:
+      
+      Respuesta del asistente:
       """
       ${results.preprocessStepResult.assistantText}
       """
-      Tool calls: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
-      Tool results: ${JSON.stringify(results.preprocessStepResult.toolResults)}
       
-      Validate:
-      1) Status codes are correct (200=success, 207=partial success, 400=bad request, 401=unauthorized, 500=server error)
-      2) Response structure matches API format (message, data, status fields)
-      3) Partial success (207) is handled appropriately with warnings
-      4) Errors are handled correctly with appropriate messages
+      Llamadas a herramientas: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
+      Resultados de herramientas: ${JSON.stringify(results.preprocessStepResult.toolResults)}
+      </input>
       
-      Return JSON with fields:
+      <validation_rules>
+      Valida:
+      1) Códigos de estado son correctos (200=éxito, 207=éxito parcial, 400=solicitud inválida, 401=no autorizado, 500=error del servidor)
+      2) Estructura de respuesta coincide con formato de API (campos message, data, status)
+      3) Éxito parcial (207) se maneja apropiadamente con advertencias
+      4) Errores se manejan correctamente con mensajes apropiados
+      </validation_rules>
+      
+      <output_format>
+      Devuelve JSON con los campos:
       {
         "validStatusCode": boolean,
         "validResponseStructure": boolean,
@@ -156,6 +173,7 @@ export const apiResponseScorer = createScorer({
         "confidence": number (0-1),
         "explanation": string
       }
+      </output_format>
     `,
   })
   .generateScore(({ results }) => {
@@ -176,21 +194,21 @@ export const apiResponseScorer = createScorer({
 
 // Required Fields Scorer - validates required fields per endpoint
 export const requiredFieldsScorer = createScorer({
-  name: 'Required Fields Validation',
-  description: 'Validates that required fields are provided for each endpoint',
+  name: 'Validación de Campos Requeridos',
+  description: 'Valida que se proporcionen todos los campos requeridos para cada endpoint',
   type: 'agent',
   judge: {
-    model: 'google/gemini-2.5-pro',
+    model: 'google/gemini-2.5-flash',
     instructions:
-      'You are an expert evaluator of API request validation. ' +
-      'Validate that all required fields are provided for each endpoint according to API documentation. ' +
-      'Return only the structured JSON matching the provided schema.',
+      '<role>Eres un evaluador experto de validación de solicitudes de API.</role> ' +
+      '<task>Valida que todos los campos requeridos se proporcionen para cada endpoint según la documentación de la API.</task> ' +
+      '<format>Devuelve solo el JSON estructurado que coincida con el esquema proporcionado.</format>',
   },
 })
   .preprocess(({ run }) => {
     const userText = (run.input?.inputMessages?.[0]?.content as string) || '';
     const assistantText = (run.output?.[0]?.content as string) || '';
-    const toolCalls = run.toolCalls || [];
+    const toolCalls = (run as any).toolCalls || [];
     return { userText, assistantText, toolCalls };
   })
   .analyze({
@@ -203,18 +221,24 @@ export const requiredFieldsScorer = createScorer({
       explanation: z.string().default(''),
     }),
     createPrompt: ({ results }) => `
-      Evaluate if required fields are provided correctly for the API endpoint.
-      User request:
+      <role>Evalúa si los campos requeridos se proporcionan correctamente para el endpoint de la API.</role>
+      
+      <input>
+      Solicitud del usuario:
       """
       ${results.preprocessStepResult.userText}
       """
-      Assistant response:
+      
+      Respuesta del asistente:
       """
       ${results.preprocessStepResult.assistantText}
       """
-      Tool calls: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
       
-      Validate according to API documentation:
+      Llamadas a herramientas: ${JSON.stringify(results.preprocessStepResult.toolCalls)}
+      </input>
+      
+      <api_endpoints>
+      Valida según la documentación de la API:
       - POST /api-ia/user: name, lastname, identification, dob, gender, procedense (768), email, phone
       - GET /api-ia/user: identification
       - DELETE /api-ia/user: ids, state
@@ -222,8 +246,10 @@ export const requiredFieldsScorer = createScorer({
       - POST /api-ia/product/variant: id, code
       - POST /api-ia/test-type: name, code, product_id
       - GET /api-ia/automatized: table
+      </api_endpoints>
       
-      Return JSON with fields:
+      <output_format>
+      Devuelve JSON con los campos:
       {
         "requiredFieldsPresent": boolean,
         "correctFieldNames": boolean,
@@ -231,6 +257,7 @@ export const requiredFieldsScorer = createScorer({
         "confidence": number (0-1),
         "explanation": string
       }
+      </output_format>
     `,
   })
   .generateScore(({ results }) => {

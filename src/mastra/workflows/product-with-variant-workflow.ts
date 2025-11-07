@@ -2,6 +2,7 @@ import { createStep, createWorkflow } from '@mastra/core/workflows';
 import { z } from 'zod';
 import { apiCall } from '../utils/api-helper';
 import { extractProductId } from '../utils/validation-helpers';
+import { ApiError } from '../utils/api-error';
 
 // Step 1: Validate Product Data
 const validateProductData = createStep({
@@ -159,13 +160,30 @@ const createProduct = createStep({
         },
       };
     } catch (error: any) {
-      // Handle specific errors
-      if (error.message && error.message.includes('400')) {
-        throw new Error(`Bad Request: ${error.message}`);
+      console.log('🔴 [create-product] Error capturado:', {
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      });
+      
+      // Si es un ApiError, pasar toda la información al agente
+      if (error instanceof ApiError) {
+        const errorInfo = error.getErrorInfo();
+        console.log('🔴 [create-product] Información completa del error de API:', JSON.stringify(errorInfo, null, 2));
+        
+        const errorMessage = JSON.stringify({
+          type: 'api_error',
+          statusCode: errorInfo.statusCode,
+          apiMessage: errorInfo.apiMessage,
+          apiResponse: errorInfo.apiResponse,
+          endpoint: errorInfo.endpoint,
+          method: errorInfo.method,
+          context: 'create-product',
+        }, null, 2);
+        
+        throw new Error(errorMessage);
       }
-      if (error.message && error.message.includes('500')) {
-        throw new Error('Internal Server Error: Error al crear el producto');
-      }
+      
       throw error;
     }
   },
@@ -255,13 +273,35 @@ const createVariant = createStep({
         variant_code: inputData.variant_code,
       };
     } catch (error: any) {
+      console.log('🔴 [create-variant] Error capturado:', {
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      });
+      
+      // Si es un ApiError, extraer información estructurada
+      let errorMessage = error.message;
+      if (error instanceof ApiError) {
+        const errorInfo = error.getErrorInfo();
+        console.log('🔴 [create-variant] Información completa del error de API:', JSON.stringify(errorInfo, null, 2));
+        errorMessage = JSON.stringify({
+          type: 'api_error',
+          statusCode: errorInfo.statusCode,
+          apiMessage: errorInfo.apiMessage,
+          apiResponse: errorInfo.apiResponse,
+          endpoint: errorInfo.endpoint,
+          method: errorInfo.method,
+          context: 'create-variant',
+        }, null, 2);
+      }
+      
       // Don't fail workflow if variant creation fails, just add warning
       const warnings = inputData.warnings || [];
-      warnings.push(`Error al crear la variante: ${error.message || 'Error desconocido'}`);
+      warnings.push(`Error al crear la variante. Información del error disponible para el agente.`);
 
       return {
         variantCreated: false,
-        variantError: error.message || 'Error desconocido al crear variante',
+        variantError: errorMessage,
         productId: inputData.productId,
         status: inputData.status,
         warnings,

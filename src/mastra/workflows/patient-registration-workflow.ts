@@ -7,6 +7,7 @@ import {
   validateEmail,
   validatePhone,
 } from '../utils/validation-helpers';
+import { ApiError } from '../utils/api-error';
 
 // Step 1: Validate Patient Data
 const validatePatientData = createStep({
@@ -179,6 +180,8 @@ const createPatient = createStep({
       throw new Error('Input data not found');
     }
 
+    console.log('🟡 [create-patient] Input data recibido:', JSON.stringify(inputData, null, 2));
+
     const body = {
       name: inputData.name,
       lastname: inputData.lastname,
@@ -190,31 +193,50 @@ const createPatient = createStep({
       phone: inputData.phone || '',
     };
 
+    console.log('🟡 [create-patient] Body preparado para API:', JSON.stringify(body, null, 2));
+
     try {
+      console.log('🟡 [create-patient] Llamando a API POST /user');
       const response = await apiCall<{
         message?: string;
         data?: any;
         status?: number;
       }>('/user', 'POST', body);
+      
+      console.log('🟢 [create-patient] Respuesta exitosa:', JSON.stringify(response, null, 2));
 
       return {
         response,
         status: response.status || 200,
       };
     } catch (error: any) {
-      // Handle specific error messages from API
-      if (error.message && error.message.includes('fecha ingresada es inválida')) {
-        throw new Error('La fecha ingresada es inválida. Por favor verifique');
+      console.log('🔴 [create-patient] Error capturado:', {
+        message: error.message,
+        stack: error.stack,
+        error: error,
+      });
+      
+      // Si es un ApiError, pasar toda la información al agente
+      if (error instanceof ApiError) {
+        const errorInfo = error.getErrorInfo();
+        console.log('🔴 [create-patient] Información completa del error de API:', JSON.stringify(errorInfo, null, 2));
+        
+        // Lanzar error con toda la información estructurada para que el agente la use
+        // El mensaje incluirá toda la información que el agente necesita
+        const errorMessage = JSON.stringify({
+          type: 'api_error',
+          statusCode: errorInfo.statusCode,
+          apiMessage: errorInfo.apiMessage,
+          apiResponse: errorInfo.apiResponse,
+          endpoint: errorInfo.endpoint,
+          method: errorInfo.method,
+          context: 'create-patient',
+        }, null, 2);
+        
+        throw new Error(errorMessage);
       }
-      if (error.message && error.message.includes('menor de edad')) {
-        throw new Error('El usuario no puede ser menor de edad');
-      }
-      if (error.message && error.message.includes('ya existe')) {
-        throw new Error('El tercero ya existe');
-      }
-      if (error.message && error.message.includes('500')) {
-        throw new Error('No se pudo crear al tercero');
-      }
+      
+      // Si no es ApiError, lanzar el error original
       throw error;
     }
   },
