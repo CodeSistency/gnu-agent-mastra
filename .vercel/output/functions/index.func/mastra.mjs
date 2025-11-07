@@ -110204,8 +110204,8 @@ const medicalAdminAgent = new Agent({
       }
     },
     storage: new LibSQLStore({
-      url: "file:../mastra.db"
-      // Persist memory across sessions
+      url: ":memory:"
+      // Using memory storage for Vercel serverless compatibility
     })
     // Memory configuration optimized for medical administrative tasks
     // Memory will persist patient consultations, user preferences, and conversation context
