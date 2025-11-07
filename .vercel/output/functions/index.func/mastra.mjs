@@ -5,8 +5,6 @@ import { createRequire } from 'module';
 import os from 'os';
 import path from 'path';
 import EventEmitter$1, { EventEmitter } from 'events';
-import pino from 'pino';
-import pretty$1 from 'pino-pretty';
 import { createClient } from '@libsql/client';
 import require$$1 from 'assert';
 
@@ -2326,6 +2324,10 @@ var BaggageTracer = class {
   }
 };
 
+function getDefaultExportFromCjs (x) {
+	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+}
+
 // src/logger/constants.ts
 var RegisteredLogger = {
   AGENT: "AGENT",
@@ -2418,10 +2420,6 @@ var ConsoleLogger = class extends MastraLogger {
     return { logs: [], total: 0, page: _args.page ?? 1, perPage: _args.perPage ?? 100, hasMore: false };
   }
 };
-
-function getDefaultExportFromCjs (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
-}
 
 // src/base.ts
 var MastraBase = class {
@@ -63936,55 +63934,6 @@ Mastra = /*@__PURE__*/(_ => {
   return Mastra;
 })();
 
-// src/pino.ts
-var PinoLogger = class extends MastraLogger {
-  logger;
-  constructor(options = {}) {
-    super(options);
-    let prettyStream = void 0;
-    if (!options.overrideDefaultTransports) {
-      prettyStream = pretty$1({
-        colorize: true,
-        levelFirst: true,
-        ignore: "pid,hostname",
-        colorizeObjects: true,
-        translateTime: "SYS:standard",
-        singleLine: false
-      });
-    }
-    const transportsAry = [...this.getTransports().entries()];
-    this.logger = pino(
-      {
-        name: options.name || "app",
-        level: options.level || LogLevel.INFO,
-        formatters: options.formatters
-      },
-      options.overrideDefaultTransports ? options?.transports?.default : transportsAry.length === 0 ? prettyStream : pino.multistream([
-        ...transportsAry.map(([, transport]) => ({
-          stream: transport,
-          level: options.level || LogLevel.INFO
-        })),
-        {
-          stream: prettyStream,
-          level: options.level || LogLevel.INFO
-        }
-      ])
-    );
-  }
-  debug(message, args = {}) {
-    this.logger.debug(args, message);
-  }
-  info(message, args = {}) {
-    this.logger.info(args, message);
-  }
-  warn(message, args = {}) {
-    this.logger.warn(args, message);
-  }
-  error(message, args = {}) {
-    this.logger.error(args, message);
-  }
-};
-
 // src/storage/constants.ts
 var TABLE_WORKFLOW_SNAPSHOT = "mastra_workflow_snapshot";
 var TABLE_EVALS = "mastra_evals";
@@ -110279,12 +110228,8 @@ const mastra = new Mastra({
     requiredFieldsScorer
   },
   storage: new LibSQLStore({
-    // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
+    // Using memory storage for Vercel serverless compatibility (file storage doesn't work in serverless)
     url: ":memory:"
-  }),
-  logger: new PinoLogger({
-    name: "Mastra",
-    level: "info"
   }),
   telemetry: {
     // Telemetry is deprecated and will be removed in the Nov 4th release
