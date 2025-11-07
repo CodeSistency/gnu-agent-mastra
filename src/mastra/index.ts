@@ -1,6 +1,5 @@
 
 import { Mastra } from '@mastra/core/mastra';
-import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
 import { VercelDeployer } from '@mastra/deployer-vercel';
 import { medicalAdminAgent } from './agents/medical-admin-agent';
@@ -28,13 +27,10 @@ export const mastra = new Mastra({
     requiredFieldsScorer,
   },
   storage: new LibSQLStore({
-    // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
-    url: "file:../mastra.db",
+    // Using memory storage for Vercel serverless compatibility (file storage doesn't work in serverless)
+    url: ":memory:",
   }),
-  logger: new PinoLogger({
-    name: 'Mastra',
-    level: 'info',
-  }),
+  // Logger removed - Mastra will use default logger compatible with Vercel serverless
   deployer: new VercelDeployer(),
   telemetry: {
     // Telemetry is deprecated and will be removed in the Nov 4th release
