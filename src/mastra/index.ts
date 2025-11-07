@@ -29,7 +29,7 @@ export const mastra = new Mastra({
   },
   storage: new LibSQLStore({
     // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
-    url: ":memory:",
+    url: "file:../mastra.db",
   }),
   logger: new PinoLogger({
     name: 'Mastra',
